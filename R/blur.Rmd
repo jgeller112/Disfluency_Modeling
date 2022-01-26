@@ -1,0 +1,772 @@
+---
+title: "Blur"
+author: "Jason Geller"
+date: "1/17/2021"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, 
+                      warning = FALSE, 
+                      message=FALSE)
+```
+
+# Generate Stimuli
+
+We create two lists here: A1 and A2. One list will serve as a study (old) list and the other will serve as a test (new) list for our recognition memory test. Because I am extra particular, we will counterbalance these so each world will serve as an old word and a new world across participants. We need to make sure our words all have similar characteristics. Here we are using the wonderful `LexOPS` package where we can generate two lists. Here we filter the corpus to only include words that are: nouns, 4-6 letters in length, have a known proportion of between 90%-100%, have a low neighborhood density (OLD20 score between 1-2), high concreteness, imageability, and word frequency. See Figure below to see dimensions of word stimuli between the two lists. 
+
+We will not run this as I already generated word lists from this and is saved in the main directory for the folder. 
+
+```{r, eval=FALSE}
+
+library(LexOPS)
+
+stim <- LexOPS::lexops %>%
+	subset(Length >= 5 & Length <= 6) %>%
+	subset(CNC.Glasgow_Norms >= 5.3 & CNC.Glasgow_Norms <= 6.8) %>%
+	subset(IMAG.Glasgow_Norms >= 5.8 & IMAG.Glasgow_Norms <= 6.8) %>%
+	subset(PK.Brysbaert >= 0.9 & PK.Brysbaert <= 1) %>%
+	subset(PoS.ELP %in% c("noun")) %>%
+	subset(ON.OLD20 >= 1 & ON.OLD20 <= 2) %>%
+	subset(Zipf.SUBTLEX_US >= 2.8 & Zipf.SUBTLEX_US <= 4.6) %>%
+	split_random(2) %>%
+	control_for(fpmw.SUBTLEX_US, -1000:1000) %>%
+	generate(84, "balanced")
+
+
+stim$A1<-toupper(stim$A1)
+stim$A2<-toupper(stim$A2)
+
+```
+We want to make sure that for each list each target word appears in only one of the conditions but appears in all conditions acorss each list. 
+
+```{r}
+
+# create levels for lists 
+blur_1 <- c("C", "HB", "LB")
+blur_2 <- c("HB", "LB", "C")
+blur_3 <- c("LB", "C", "HB")
+
+```
+
+```{r}
+#stim<-read_csv(here::here("generated_stimuli_US.csv"))
+
+L1_encoding <- stim %>%
+  select(A1) %>%
+  mutate(blur=rep(blur_1, times=28), study="old", lex="y") %>%
+  dplyr::rename("string" = "A1") 
+
+L1_long<- long_format(stim)
+
+L1_test <- L1_long %>%
+  filter(condition=="A2") %>%
+  select(condition, string) %>%
+  mutate(blur=rep(blur_1, times=28), study="new", lex="y") %>%
+  select(-condition)%>%
+  rbind(L1_encoding, .)
+
+L1_encoding
+
+dplyr::count(L1_test, string, blur, study)
+
+```
+
+```{r}
+
+L2_encoding <- stim %>%
+  select(A1) %>%
+  mutate(blur=rep(blur_2, times=28), study="old", lex="y") %>%
+  dplyr::rename("string" = "A1")
+
+L2_long<- long_format(stim)
+
+L2_test <- L2_long %>%
+  filter(condition=="A2") %>%
+  select(condition, string) %>%
+  mutate(blur=rep(blur_2, times=28), study="new", lex="y") %>%
+  select(-condition)%>%
+  rbind(L2_encoding, .)
+
+L2_encoding
+
+dplyr::count(L2_test, blur, study)
+
+
+
+```
+
+```{r}
+
+L3_encoding <- stim %>%
+  select(A1) %>%
+  mutate(blur=rep(blur_3, times=28), study="old", lex="y") %>%
+  dplyr::rename("string" = "A1")
+
+L3_long<- long_format(stim)
+
+L3_test <- L3_long %>%
+  filter(condition=="A2") %>%
+  select(condition, string) %>%
+  mutate(blur=rep(blur_3, times=28), study="new", lex="y") %>%
+  select(-condition)%>%
+  rbind(L3_encoding, .)
+
+L3_encoding
+
+dplyr::count(L3_test, blur, study)
+
+
+
+```
+
+
+```{r}
+
+L4_encoding <- stim %>%
+  select(A2) %>%
+  mutate(blur=rep(blur_1, times=28), study="old", lex="y") %>%
+  dplyr::rename("string" = "A2")
+
+L4_long<- long_format(stim)
+
+L4_test <- L4_long %>%
+  filter(condition=="A1") %>%
+  select(condition, string) %>%
+  mutate(blur=rep(blur_1, times=28), study="new", lex="y") %>%
+  select(-condition)%>%
+  rbind(L4_encoding, .)
+
+L4_encoding
+
+dplyr::count(L4_test, blur, study)
+
+
+
+```
+
+
+```{r}
+
+L5_encoding <- stim %>%
+  select(A2) %>%
+  mutate(blur=rep(blur_2, times=28), study="old", lex="y") %>%
+  dplyr::rename("string" = "A2")
+
+L5_long<- long_format(stim)
+
+L5_test <- L5_long %>%
+  filter(condition=="A1") %>%
+  select(condition, string) %>%
+  mutate(blur=rep(blur_2, times=28), study="new", lex="y") %>%
+  select(-condition)%>%
+  rbind(L5_encoding, .)
+
+L5_encoding
+
+dplyr::count(L5_test, blur, study)
+
+
+
+```
+
+```{r}
+
+L6_encoding <- stim %>%
+  select(A2) %>%
+  mutate(blur=rep(blur_3, times=28), study="old", lex="y") %>%
+  dplyr::rename("string" = "A2")
+
+L6_long<- long_format(stim)
+
+L6_test <- L6_long %>%
+  filter(condition=="A1") %>%
+  select(condition, string) %>%
+  mutate(blur=rep(blur_3, times=28), study="new", lex="y") %>%
+  select(-condition)%>%
+  rbind(L6_encoding, .)
+
+L6_encoding
+
+dplyr::count(L6_test, blur, study)
+
+```
+
+# Nonwords
+
+We need to grab some nonwords for our LDT.  I used the ELP (could not get Wuggy to work). We dont care for nonwords so we pick 84 nonwrods to use across all 6 of our lists. We do not show nonwords during the recognition phase. 
+
+```{r}
+#nonwords<-read_csv(here::here("NonWord.csv"))
+
+
+
+nonwrds_select <- nonwords %>%
+  sample_n(84, replace=FALSE, seed=96) %>%
+  select(Word)
+
+
+
+L1_nwrds <- nonwrds_select %>% 
+  mutate(blur=rep(blur_1, times=28), study="old", lex="n")
+
+
+
+L1_nwrds$Word <- toupper(L1_nwrds$Word)
+
+L1_nwrds$string<-gsub("'", "", L1_nwrds$string)
+
+L1_nwrds <- rename(L1_nwrds, "string" = "Word")
+
+```
+
+```{r}
+
+setwd(here::here("lists"))
+
+
+L1_wrd_nw_encoding <- rbind(L1_encoding, L1_nwrds)
+
+L1_wrd_nw_encoding <- mutate(L1_wrd_nw_encoding, stim_path = ifelse(blur=="C", paste("/images/",L1_wrd_nw_encoding$string, ".png", sep="_"), paste("/images/",L1_wrd_nw_encoding$string,L1_wrd_nw_encoding$blur,".png", sep="_")))
+
+L1_wrd_nw_encoding$stim_path<-gsub("_", "", L1_wrd_nw_encoding$stim_path)
+
+L1_test<-mutate(L1_test, stim_path = ifelse(blur=="C", paste("/images/",L1_test$string, ".png", sep="_"), paste("/images/",L1_test$string,L1_test$blur,".png", sep="_")))
+
+L1_test$stim_path<-gsub("_", "", L1_test$stim_path)
+
+write.csv(L1_wrd_nw_encoding, file="L1_wrd_nw.csv")
+write.csv(L1_test, file="L1_wrd_test.csv")
+
+
+
+```
+
+```{r}
+
+setwd(here::here("lists"))
+
+
+L2_wrd_nw_encoding <- rbind(L2_encoding, L1_nwrds)
+
+L2_wrd_nw_encoding<- mutate(L2_wrd_nw_encoding, stim_path = ifelse(blur=="C", paste("/images/",L2_wrd_nw_encoding$string, ".png", sep="_"), paste("/images/",L2_wrd_nw_encoding$string,L2_wrd_nw_encoding$blur,".png", sep="_")))
+
+L2_wrd_nw_encoding$stim_path<-gsub("_", "", L2_wrd_nw_encoding$stim_path)
+
+
+L2_test <- mutate(L2_test, stim_path = ifelse(blur=="C", paste("/images/",L2_test$string, ".png", sep="_"), paste("/images/",L2_test$string,L2_test$blur,".png", sep="_")))
+
+L2_test $stim_path<-gsub("_", "", L2_test$stim_path)
+
+write.csv(L2_wrd_nw_encoding, file="L2_wrd_nw.csv")
+write.csv(L2_test, file="L2_wrd_test.csv")
+
+
+
+```
+
+
+```{r}
+
+setwd(here::here("lists"))
+
+L3_wrd_nw_encoding <- rbind(L3_encoding, L1_nwrds)
+
+L3_wrd_nw_encoding <- mutate(L3_wrd_nw_encoding, stim_path = ifelse(blur=="C", paste("/images/",L3_wrd_nw_encoding$string, ".png", sep="_"), paste("/images/",L3_wrd_nw_encoding$string,L3_wrd_nw_encoding$blur,".png", sep="_")))
+
+L3_wrd_nw_encoding$stim_path<-gsub("_", "", L3_wrd_nw_encoding$stim_path)
+
+
+L3_test<- mutate(L3_test, stim_path = ifelse(blur=="C", paste("/images/",L3_test$string, ".png", sep="_"), paste("/images/",L3_test$string,L3_test$blur,".png", sep="_")))
+
+L3_test$stim_path<-gsub("_", "", L3_test$stim_path)
+
+write.csv(L3_wrd_nw_encoding, file="L3_wrd_nw.csv")
+write.csv(L3_test, file="L3_wrd_test.csv")
+
+```
+
+
+```{r}
+
+setwd(here::here("lists"))
+
+
+L4_wrd_nw_encoding <- rbind(L4_encoding, L1_nwrds)
+
+L4_wrd_nw_encoding <- mutate(L4_wrd_nw_encoding, stim_path = ifelse(blur=="C", paste("/images/",L4_wrd_nw_encoding$string, ".png", sep="_"), paste("/images/",L4_wrd_nw_encoding$string,L4_wrd_nw_encoding$blur,".png", sep="_")))
+
+L4_wrd_nw_encoding$stim_path<-gsub("_", "", L4_wrd_nw_encoding$stim_path)
+
+
+L4_test <- mutate(L4_test, stim_path = ifelse(blur=="C", paste("/images/",L4_test$string, ".png", sep="_"), paste("/images/",L4_test$string,L4_test$blur,".png", sep="_")))
+
+L4_test$stim_path<-gsub("_", "", L4_test$stim_path)
+
+write.csv(L4_wrd_nw_encoding, file="L4_wrd_nw.csv")
+write.csv(L4_test, file="L4_wrd_test.csv")
+
+```
+
+```{r}
+
+setwd(here::here("lists"))
+
+
+L5_wrd_nw_encoding <- rbind(L5_encoding, L1_nwrds)
+
+
+L5_wrd_nw_encoding <- mutate(L5_wrd_nw_encoding, stim_path = ifelse(blur=="C", paste("/images/",L5_wrd_nw_encoding$string, ".png", sep="_"), paste("/images/",L5_wrd_nw_encoding$string,L5_wrd_nw_encoding$blur,".png", sep="_")))
+
+L5_wrd_nw_encoding$stim_path<-gsub("_", "", L5_wrd_nw_encoding$stim_path)
+
+
+
+L5_test <- mutate(L5_test, stim_path = ifelse(blur=="C", paste("/images/",L5_test$string, ".png", sep="_"), paste("/images/",L5_test$string,L5_test$blur,".png", sep="_")))
+
+L5_test$stim_path<-gsub("_", "", L5_test$stim_path)
+
+
+write.csv(L5_wrd_nw_encoding, file="L5_wrd_nw.csv")
+write.csv(L5_test, file="L5_wrd_test.csv")
+
+```
+
+```{r}
+
+setwd(here::here("lists"))
+
+
+L6_wrd_nw_encoding <- rbind(L6_encoding, L1_nwrds)
+
+L6_wrd_nw_encoding <- mutate(L6_wrd_nw_encoding, stim_path = ifelse(blur=="C", paste("/images/",L6_wrd_nw_encoding$string, ".png", sep=""), paste("/images/",L6_wrd_nw_encoding$string,L6_wrd_nw_encoding$blur,".png", sep="")))
+
+L6_wrd_nw_encoding$stim_path<-gsub("_", "", L6_wrd_nw_encoding$stim_path)
+
+
+L6_test <- mutate(L6_test, stim_path = ifelse(blur=="C", paste("/images/",L6_test$string, ".png", sep="_"), paste("/images/",L6_test$string,L6_test$blur,".png", sep="_")))
+
+L6_test$stim_path<-gsub("_", "", L6_test$stim_path)
+
+
+write.csv(L6_wrd_nw_encoding, file="L6_wrd_nw.csv")
+write.csv(L6_test, file="L6_wrd_test.csv")
+
+```
+
+# Images 
+
+
+```{r}
+
+setwd(here::here("word_images")) # output images to this folder
+
+for (i in 1:length(string)) { 
+  png(paste(string[i],".png", sep="_"))
+  par(bg="black")
+  plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+  par(ps=36)
+  text(x = 0.5, y = 0.5, paste(string[i]),font=2, cex=2, col = "white")
+  #par(ps=18) 
+  dev.off()
+}
+setwd(here::here("nonword_images")) # output images to this folder
+
+for (i in 1:length(nw_strings)) { 
+  png(paste(nw_strings[i],".png", sep="_"))
+  par(bg="black")
+  plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+  par(ps=36)
+  text(x = 0.5, y = 0.5, paste(nw_strings[i]),font=2, cex=2, col = "white")
+  #par(ps=18) 
+  dev.off()
+}
+
+
+
+```
+
+This document demonstrates a function that takes a list of word images and blurs them with an user-specified level of blur. 
+
+# Word Lists
+
+# The below function takes a list of images we saved above and then reads them into the blur_words functions. This will save each blurred word with level of blurring specified in the file name. 
+
+```{r blur}
+
+#first get a list of words we want to blurpattern
+
+# set the wd to save the blurred words there
+
+blur_words <- function(word_list, sigma=NULL, degree=NULL) { 
+  
+  if (degree=="HB") { 
+  
+  for (i in 1:length(word_list)) {
+    
+    im <- imager::load.image(word_list[i])
+    word_blur <- isoblur(im,sigma, gaussian = TRUE)
+    word_list[i] <- gsub(".png","", word_list[i])
+    imager::save.image(word_blur,file=paste(word_list[i],"HB",".png", sep=""))
+    
+  }
+  } 
+    else  {
+      
+     for (i in 1:length(word_list)) {
+    
+    im <- imager::load.image(word_list[i])
+    word_blur <- isoblur(im,sigma, gaussian = TRUE)
+    word_list[i] <- gsub(".png","", word_list[i])
+    imager::save.image(word_blur,file=paste(word_list[i],"LB",".png", sep=""))
+     }
+    }
+    
+  }
+   
+```
+
+
+# Save new blurred words in a folder called blurred_images
+
+```{r}
+
+setwd(here::here("word_images"))
+
+L1_test_HB<-dplyr::filter(L1_test, L1_test$blur=="HB")
+L1_test_c<-dplyr::filter(L1_test, L1_test$blur=="C")
+L1_test_LB<-dplyr::filter(L1_test, L1_test$blur=="LB")
+
+L1_nw_HB<-dplyr::filter(L1_wrd_nw_encoding,L1_wrd_nw_encoding$blur=="HB", lex=="n")
+L1_nw_c<-dplyr::filter(L1_wrd_nw_encoding, L1_wrd_nw_encoding$blur=="C", lex=="n")
+L1_nw_LB<-dplyr::filter(L1_wrd_nw_encoding, L1_wrd_nw_encoding$blur=="LB", lex=="n")
+
+strings_c<- L1_test_c$string
+strings_HB<-paste(L1_test_HB$string,".png", sep="")
+strings_LB<-paste(L1_test_LB$string, ".png", sep="")
+
+strings_c_nw<- L1_nw_c$string
+strings_HB_nw<-paste(L1_nw_HB$string,".png", sep="")
+strings_LB_nw<-paste(L1_nw_LB$string,".png", sep="")
+
+for (i in 1:length(strings_c)) { 
+  png(paste(strings_c[i],".png", sep="_"))
+  par(bg = 'black')
+  plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+  par(ps=36)
+  text(x = 0.5, y = 0.5, paste(strings_c[i]),font=2, cex=2, col = "white")
+  #par(ps=18) 
+  dev.off()
+}
+
+
+blur_words(word_list = strings_HB, sigma=10, degree="HB")
+blur_words(word_list = strings_LB, sigma=5, degree="LB")
+
+setwd(here::here("nonword_images"))
+
+for (i in 1:length(strings_c_nw)) { 
+  png(paste(strings_c_nw[i],".png", sep=""))
+  par(bg = 'black')
+  plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+  par(ps=36)
+  text(x = 0.5, y = 0.5, paste(strings_c_nw[i]),font=2, cex=2, col = "white")
+  #par(ps=18) 
+  dev.off()
+}
+
+
+blur_words(word_list = strings_HB_nw, sigma=10, degree="HB")
+blur_words(word_list = strings_LB_nw, sigma=5, degree="LB")
+
+
+```
+
+```{r}
+
+setwd(here::here("word_images"))
+
+L2_test_HB<-dplyr::filter(L2_test, L2_test$blur=="HB")
+L2_test_c<-dplyr::filter(L2_test, L2_test$blur=="C")
+L2_test_LB<-dplyr::filter(L2_test, L2_test$blur=="LB")
+
+L2_nw_HB<-dplyr::filter(L2_wrd_nw_encoding,L2_wrd_nw_encoding$blur=="HB", lex=="n")
+L2_nw_c<-dplyr::filter(L2_wrd_nw_encoding, L2_wrd_nw_encoding$blur=="C", lex=="n")
+L2_nw_LB<-dplyr::filter(L2_wrd_nw_encoding, L2_wrd_nw_encoding$blur=="LB", lex=="n")
+
+strings_c<- L2_test_c$string
+strings_HB<-paste(L2_test_HB$string,".png", sep="")
+strings_LB<-paste(L2_test_LB$string, ".png", sep="")
+
+strings_c_nw<- L2_nw_c$string
+strings_HB_nw<-paste(L2_nw_HB$string,".png", sep="")
+strings_LB_nw<-paste(L2_nw_LB$string,".png", sep="")
+
+for (i in 1:length(strings_c)) { 
+  png(paste(strings_c[i],".png", sep=""))
+  par(bg = 'black')
+  plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+  par(ps=36)
+  text(x = 0.5, y = 0.5, paste(strings_c[i]),font=2, cex=2, col = "white")
+  #par(ps=18) 
+  dev.off()
+}
+
+
+blur_words(word_list = strings_HB, sigma=10, degree="HB")
+blur_words(word_list = strings_LB, sigma=5, degree="LB")
+
+setwd(here::here("nonword_images"))
+
+for (i in 1:length(strings_c_nw)) { 
+  png(paste(strings_c_nw[i],".png", sep=""))
+  par(bg = 'black')
+  plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+  par(ps=36)
+  text(x = 0.5, y = 0.5, paste(strings_c_nw[i]),font=2, cex=2, col = "white")
+  #par(ps=18) 
+  dev.off()
+}
+
+
+blur_words(word_list = strings_HB_nw, sigma=10, degree="HB")
+blur_words(word_list = strings_LB_nw, sigma=5, degree="LB")
+
+
+```
+
+
+```{r}
+
+setwd(here::here("word_images"))
+
+L3_test_HB<-dplyr::filter(L3_test, L3_test$blur=="HB")
+L3_test_c<-dplyr::filter(L3_test, L3_test$blur=="C")
+L3_test_LB<-dplyr::filter(L3_test, L3_test$blur=="LB")
+
+L3_nw_HB<-dplyr::filter(L3_wrd_nw_encoding,L3_wrd_nw_encoding$blur=="HB", lex=="n")
+L3_nw_c<-dplyr::filter(L3_wrd_nw_encoding, L3_wrd_nw_encoding$blur=="C", lex=="n")
+L3_nw_LB<-dplyr::filter(L3_wrd_nw_encoding, L3_wrd_nw_encoding$blur=="LB", lex=="n")
+
+strings_c<- L3_test_c$string
+strings_HB<-paste(L3_test_HB$string,".png", sep="")
+strings_LB<-paste(L3_test_LB$string, ".png", sep="")
+
+strings_c_nw<- L3_nw_c$string
+strings_HB_nw<-paste(L3_nw_HB$string,".png", sep="")
+strings_LB_nw<-paste(L3_nw_LB$string,".png", sep="")
+
+for (i in 1:length(strings_c)) { 
+  png(paste(strings_c[i],".png", sep=""))
+  par(bg = 'black')
+  plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+  par(ps=36)
+  text(x = 0.5, y = 0.5, paste(strings_c[i]),font=2, cex=2, col = "white")
+  #par(ps=18) 
+  dev.off()
+}
+
+blur_words(word_list = strings_HB, sigma=10, degree="HB")
+blur_words(word_list = strings_LB, sigma=5, degree="LB")
+
+setwd(here::here("nonword_images"))
+
+for (i in 1:length(strings_c_nw)) { 
+  png(paste(strings_c_nw[i],".png", sep=""))
+  par(bg = 'black')
+  plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+  par(ps=36)
+  text(x = 0.5, y = 0.5, paste(strings_c_nw[i]),font=2, cex=2, col = "white")
+  #par(ps=18) 
+  dev.off()
+}
+
+blur_words(word_list = strings_HB_nw, sigma=10, degree="HB")
+blur_words(word_list = strings_LB_nw, sigma=5, degree="LB")
+
+
+```
+
+
+```{r}
+
+setwd(here::here("word_images"))
+
+L4_test_HB<-dplyr::filter(L4_test, L4_test$blur=="HB")
+L4_test_c<-dplyr::filter(L4_test, L4_test$blur=="C")
+L4_test_LB<-dplyr::filter(L4_test, L4_test$blur=="LB")
+
+L4_nw_HB<-dplyr::filter(L4_wrd_nw_encoding,L4_wrd_nw_encoding$blur=="HB", lex=="n")
+L4_nw_c<-dplyr::filter(L4_wrd_nw_encoding, L4_wrd_nw_encoding$blur=="C", lex=="n")
+L4_nw_LB<-dplyr::filter(L4_wrd_nw_encoding, L4_wrd_nw_encoding$blur=="LB", lex=="n")
+
+strings_c<- L4_test_c$string
+strings_HB<-paste(L4_test_HB$string,".png", sep="")
+strings_LB<-paste(L4_test_LB$string, ".png", sep="")
+
+strings_c_nw<- L4_nw_c$string
+strings_HB_nw<-paste(L4_nw_HB$string,".png", sep="")
+strings_LB_nw<-paste(L4_nw_LB$string,".png", sep="")
+
+for (i in 1:length(strings_c)) { 
+  png(paste(strings_c[i],".png", sep=""))
+  par(bg = 'black')
+  plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+  par(ps=36)
+  text(x = 0.5, y = 0.5, paste(strings_c[i]),font=2, cex=2, col = "white")
+  #par(ps=18) 
+  dev.off()
+}
+
+blur_words(word_list = strings_HB, sigma=10, degree="HB")
+blur_words(word_list = strings_LB, sigma=5, degree="LB")
+
+setwd(here::here("nonword_images"))
+
+for (i in 1:length(strings_c_nw)) { 
+  png(paste(strings_c_nw[i],".png", sep=""))
+  par(bg = 'black')
+  plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+  par(ps=36)
+  text(x = 0.5, y = 0.5, paste(strings_c_nw[i]),font=2, cex=2, col = "white")
+  #par(ps=18) 
+  dev.off()
+}
+
+blur_words(word_list = strings_HB_nw, sigma=10, degree="HB")
+blur_words(word_list = strings_LB_nw, sigma=5, degree="LB")
+
+
+```
+
+
+```{r}
+
+setwd(here::here("word_images"))
+
+L6_test_HB<-dplyr::filter(L6_test, L6_test$blur=="HB")
+L6_test_c<-dplyr::filter(L6_test, L6_test$blur=="C")
+L6_test_LB<-dplyr::filter(L6_test, L6_test$blur=="LB")
+
+L6_nw_HB<-dplyr::filter(L6_wrd_nw_encoding,L6_wrd_nw_encoding$blur=="HB", lex=="n")
+L6_nw_c<-dplyr::filter(L6_wrd_nw_encoding, L6_wrd_nw_encoding$blur=="C", lex=="n")
+L6_nw_LB<-dplyr::filter(L6_wrd_nw_encoding, L6_wrd_nw_encoding$blur=="LB", lex=="n")
+
+strings_c<- L6_test_c$string
+strings_HB<-paste(L6_test_HB$string,".png", sep="")
+strings_LB<-paste(L6_test_LB$string, ".png", sep="")
+
+strings_c_nw<- L6_nw_c$string
+strings_HB_nw<-paste(L6_nw_HB$string,".png", sep="")
+strings_LB_nw<-paste(L6_nw_LB$string,".png", sep="")
+
+for (i in 1:length(strings_c)) { 
+  png(paste(strings_c[i],".png", sep=""))
+  par(bg = 'black')
+  plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+  par(ps=36)
+  text(x = 0.5, y = 0.5, paste(strings_c[i]),font=2, cex=2, col = "white")
+  #par(ps=18) 
+  dev.off()
+}
+
+blur_words(word_list = strings_HB, sigma=10, degree="HB")
+blur_words(word_list = strings_LB, sigma=5, degree="LB")
+
+setwd(here::here("nonword_images"))
+
+for (i in 1:length(strings_c_nw)) { 
+  png(paste(strings_c_nw[i],".png", sep=""))
+  par(bg = 'black')
+  plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+  par(ps=36)
+  text(x = 0.5, y = 0.5, paste(strings_c_nw[i]),font=2, cex=2, col = "white")
+  #par(ps=18) 
+  dev.off()
+}
+
+blur_words(word_list = strings_HB_nw, sigma=10, degree="HB")
+blur_words(word_list = strings_LB_nw, sigma=5, degree="LB")
+
+
+```
+
+
+
+
+```{r}
+
+setwd(here::here("word_images"))
+
+L5_test_HB<-dplyr::filter(L5_test, L5_test$blur=="HB")
+L5_test_c<-dplyr::filter(L5_test, L5_test$blur=="C")
+L5_test_LB<-dplyr::filter(L5_test, L5_test$blur=="LB")
+
+L5_nw_HB<-dplyr::filter(L5_wrd_nw_encoding,L5_wrd_nw_encoding$blur=="HB", lex=="n")
+L5_nw_c<-dplyr::filter(L5_wrd_nw_encoding, L5_wrd_nw_encoding$blur=="C", lex=="n")
+L5_nw_LB<-dplyr::filter(L5_wrd_nw_encoding, L5_wrd_nw_encoding$blur=="LB", lex=="n")
+
+strings_c<- L5_test_c$string
+strings_HB<-paste(L5_test_HB$string,".png", sep="")
+strings_LB<-paste(L5_test_LB$string, ".png", sep="")
+
+strings_c_nw<- L5_nw_c$string
+strings_HB_nw<-paste(L5_nw_HB$string,".png", sep="")
+strings_LB_nw<-paste(L5_nw_LB$string,".png", sep="")
+
+for (i in 1:length(strings_c)) { 
+  png(paste(strings_c[i],".png", sep=""))
+  par(bg = 'black')
+  plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+  par(ps=36)
+  text(x = 0.5, y = 0.5, paste(strings_c[i]),font=2, cex=2, col = "white")
+  #par(ps=18) 
+  dev.off()
+}
+
+blur_words(word_list = strings_HB, sigma=10, degree="HB")
+blur_words(word_list = strings_LB, sigma=5, degree="LB")
+
+setwd(here::here("nonword_images"))
+
+for (i in 1:length(strings_c_nw)) { 
+  png(paste(strings_c_nw[i],".png", sep=""))
+  par(bg = 'black')
+  plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+  par(ps=36)
+  text(x = 0.5, y = 0.5, paste(strings_c_nw[i]),font=2, cex=2, col = "white")
+  #par(ps=18) 
+  dev.off()
+}
+
+blur_words(word_list = strings_HB_nw, sigma=10, degree="HB")
+blur_words(word_list = strings_LB_nw, sigma=5, degree="LB")
+
+
+```
+
+
+
+```{r}
+
+setwd(here::here("raw_images"))
+
+blur_words(word_list = images, sigma=14, degree="HB")
+
+blur_words(word_list = images, sigma=7, degree="LB")
+
+
+```
+# Example
+
+```{r eval=FALSE}
+im <- imager::load.image(here::here("raw_images", "army_.png"))
+
+plot(im)
+
+im_blur <- imager::load.image(here::here("raw_images", "army_.png_blur_4_.png"))
+
+plot(im_blur)
+
+```

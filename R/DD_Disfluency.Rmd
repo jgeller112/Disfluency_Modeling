@@ -1,0 +1,126 @@
+---
+title: "DDM"
+author: "Jason Geller"
+date: "1/10/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+library(brms)
+library(osfr)
+library(tidyverse)
+```
+
+# Load Data
+
+Read in from OSF 
+
+```{r}
+
+# use opst to read in files from osfpage
+##    osf_download(conflicts = "skip")
+
+
+rts_pilot<-read_csv("rts_pilot_010821.csv")
+
+rts_pilot
+
+```
+
+```{r}
+
+
+bform_exg1 <- bf(
+rt ~ blur + (1 |p| subID) + (1 |i| string),
+sigma ~ blur + (1 |p| subID) + (1 |i| string),
+beta ~ blur + (1 |p| subID) + (1 |i| string)
+)
+
+```
+
+
+```{r}
+rotation<- rotation %>%
+  group_by(subID) %>%
+  filter(lex=="word", rt>.2, rt < 2)
+
+rotation
+```
+
+
+```{r}
+
+library(cmdstanr)
+
+fit_exg1 <- brm(
+bform_exg1, data = rotation,
+family = brmsfamily("exgaussian", link_sigma = "log", link_beta = "log"),
+control = list(adapt_delta = 0.99), chains=4, cores=4, threads = threading(4),  backend="cmdstanr")
+
+
+save(fit_exg1, file = "blmm_exp1_rt_dist_revision.RData")
+
+```
+
+```{r}
+
+
+pp_check(fit_exg1)
+```
+
+```{r}
+library(patchwork)
+
+p1<-conditional_effects(fit_exg1, "blur", dpar = "mu")
+p2<-conditional_effects(fit_exg1, "blur", dpar = "sigma")
+p3<- conditional_effects(fit_exg1, "blur", dpar = "beta")
+
+p1
+
+p2
+
+p3
+p1+p2+p3
+
+```
+
+```{r}
+#fit 3 parm diff
+bform_drift1 <- bf(
+rt| dec(corr) ~ blur + (1 |p| subID),
+bs ~ blur + (1 |p| subID) ,
+ndt ~ blur + (1 |p| subID),
+bias = 0.5
+)
+
+```
+
+
+```{r}
+chains <- 4
+inits_drift <- list(temp_ndt_Intercept = -3)
+inits_drift <- replicate(chains, inits_drift, simplify = FALSE)
+
+
+fit_drift1 <- brm(
+bform_drift1, data = rotation,
+family = brmsfamily("wiener", "log", link_bs = "log", link_ndt = "log"),
+chains = chains, cores = chains,
+inits = inits_drift, init_r = 0,
+control = list(adapt_delta = 0.99)
+ )
+
+save(fit_drift1, file = "drift_rt_dist_revision.RData")
+
+
+```
