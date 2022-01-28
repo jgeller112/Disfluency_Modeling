@@ -19,6 +19,8 @@ When you click the **Knit** button a document will be generated that includes bo
 library(brms)
 library(osfr)
 library(tidyverse)
+library(here)
+library(data.table)
 ```
 
 # Load Data
@@ -37,6 +39,47 @@ rts_pilot
 
 ```
 
+
+
+```{r}
+
+
+
+file<-list.files(here::here("pilot_data"), pattern = ".csv") # get files 
+
+setwd(here::here("pilot_data"))
+
+rt <-
+  do.call("rbind.fill", lapply(file, FUN=function(files){
+    
+    for (i in 1:length(files)){ 
+      if(file.exists(files[i])){
+        message( "now processing:", files[i])
+      }
+    }
+    fread(files, header=TRUE, sep=",", na.strings = "", fill=TRUE)}))#fread makes reading in f
+
+
+```
+
+```{r}
+
+rt1<- rt %>%
+  filter(maintrials.ran==1)%>%
+  select(participant, string, blur, study, lex, corr, rt) %>%
+  mutate(lex=ifelse(lex=="y", "word", "nonword"))
+#mutate(rt_win=datawizard::winsorize(rt))
+
+rt1
+
+accuracy<-rt1 %>%
+  dplyr::group_by(participant)%>%
+  dplyr::summarise(accuray=mean(acc, na.rm=TRUE))
+
+accuracy
+
+```
+
 ```{r}
 
 
@@ -52,6 +95,7 @@ beta ~ blur + (1 |p| subID) + (1 |i| string)
 ```{r}
 rotation<- rotation %>%
   group_by(subID) %>%
+  mu
   filter(lex=="word", rt>.2, rt < 2)
 
 rotation
