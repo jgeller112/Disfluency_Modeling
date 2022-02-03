@@ -1,0 +1,445 @@
+---
+title: "Blur_RT_"
+author: "Jason Geller"
+date: "1/5/2022"
+output: html_document
+---
+# This markdown file shows how to read data abd plot our accuracy, RT, and memory data for our ploit study. 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(plyr)
+library(tidyverse)
+library(here)
+library(data.table)
+library(ggrepel)
+library(osfr)
+
+```
+# OSF Data
+
+First let's read in our data from OSF
+
+
+
+```{r}
+#usethis::edit_r_environ()need to allow osf to gain access use code below
+#OSF_PAT = "rnuJPLnoikl36gDSaxuGfWUD8IgaI2e7UAYix0CIiFpelwafTS4ww8v6Yj5j9DUv5hpy8r"
+#osf_auth("rnuJPLnoikl36gDSaxuGfWUD8IgaI2e7UAYix0CIiFpelwafTS4ww8v6Yj5j9DUv5hpy8r")
+
+osf_retrieve_file("https://osf.io/8bgyn/") %>%
+    osf_download(conflicts = "skip")
+
+dataset<-read_csv("rts_pilot_010821.csv")
+
+
+```
+
+```{r message=FALSE, warning=FALSE, echo=FALSE} 
+# read in low test expect data exported from gorilla
+#setwd(here::here('Expt2_low_high', "mturk_cue_recall_low")) # folder to find Ps in
+
+#data=here::here("Expt2_low_high", "mturk_cue_recall_low")  # path to data files
+
+data=here::here("data")
+
+file_list_rts=list.files(data, pattern=".csv") # list of data files
+
+setwd(data)
+# read in all files
+rts <-
+  do.call("rbind.fill", lapply(file_list_rts, FUN=function(files){
+    
+    for (i in 1:length(files)){ 
+      if(file.exists(files[i])){
+        message( "now processing:", files[i])
+      }
+    }
+    fread(files, header=TRUE, sep=",", na.strings = "", fill=TRUE)}))#fread makes reading in f
+
+
+#collect RTs
+dataset <- rts %>% 
+  dplyr::filter(maintrials.thisRepN==0) %>%
+  dplyr::select(participant, date, string, study, blur, rt, corr, lex)%>%
+  drop_na()
+```
+
+```{r}
+
+top_mean <-dataset %>%  #get means for plot
+  dplyr::filter(lex=="m")%>%
+   dplyr::group_by(blur)%>%
+   dplyr::summarise(mean1=mean(corr)) %>%
+  dplyr::ungroup()
+
+
+p_mean <-dataset %>%  #get means for plot
+  dplyr::filter(lex=="m")%>%
+    dplyr::group_by(participant, blur)%>%
+     dplyr::summarise(mean1=mean(corr))
+      
+
+
+```
+```{r}
+p_mean <-dataset %>%  #get means for plot
+  dplyr::filter(lex=="m")%>%
+    dplyr::group_by(participant, blur)%>%
+     dplyr::summarise(mean1=mean(corr))
+
+
+```
+
+
+
+
+```{r prep, message=FALSE}
+## packages
+library(tidyverse)
+library(colorspace)
+library(ragg)
+library(cowplot)
+library(ggtext)
+library(pdftools)
+
+bold <- element_text(face = "bold", color = "black", size = 16) #axis bold
+
+
+theme_set(theme_minimal(base_size = 15, base_family = "Arial"))
+theme_update(
+  panel.grid.major = element_line(color = "grey92", size = .4),
+  panel.grid.minor = element_blank(),
+  axis.title.x = element_text(color = "grey30", margin = margin(t = 7)),
+  axis.title.y = element_text(color = "grey30", margin = margin(r = 7)),
+  axis.text = element_text(color = "grey50"),
+  axis.ticks =  element_line(color = "grey92", size = .4),
+  axis.ticks.length = unit(.6, "lines"),
+  legend.position = "top",
+  plot.title = element_text(hjust = 0, color = "black", 
+                            family = "Arial",
+                            size = 21, margin = margin(t = 10, b = 35)),
+  plot.subtitle = element_text(hjust = 0, face = "bold", color = "grey30",
+                               family = "Arial", 
+                               size = 14, margin = margin(0, 0, 25, 0)),
+  plot.title.position = "plot",
+  plot.caption = element_text(color = "grey50", size = 10, hjust = 1,
+                              family = "Arial", 
+                              lineheight = 1.05, margin = margin(30, 0, 0, 0)),
+  plot.caption.position = "plot", 
+  plot.margin = margin(rep(20, 4))
+)
+pal <- c("#FF8C00", "#A034F0", "#159090")
+```
+
+
+```{r}
+p3 <- ggplot(p_mean, aes(x = blur , y = mean1, fill = blur)) +
+    coord_cartesian(ylim = c(.7,1)) + 
+  
+  ggdist::stat_halfeye(
+    aes(
+      y = mean1,
+      color = blur,
+      fill = after_scale(lighten(color, .5))
+    ),
+    shape = 18,
+    point_size = 3,
+    interval_size = 1.8,
+    adjust = .5,
+    .width = c(0, 1)
+  ) +
+    geom_point(aes(x = blur, y = mean1, colour = blur),position = position_jitter(width = .05), size = 1, shape = 20)+
+    geom_boxplot(aes(x = blur, y = mean1, fill = blur),outlier.shape = NA, alpha = .5, width = .1, colour = "black")+
+  labs(subtitle = "Word Accuracy")+
+     scale_colour_brewer(palette = "Dark2")+
+  scale_fill_brewer(palette = "Dark2") + 
+    stat_summary(fun=mean, geom="point", colour="darkred", size=3)+
+    labs(y = "Accuracy", x = "Blur") + theme_bw(base_size = 14)+
+    geom_label_repel(data=top_mean, aes(y=mean1, label=round(mean1, 2)), color="black", min.segment.length = 0, seed = 42, box.padding = 0.5) + 
+    theme(axis.text=bold) + theme(legend.position = "none") 
+  #  ggsave('place.png', width = 8, height = 6)
+
+p3
+```
+# Delta
+
+
+```{r}
+#Delta plots (one per subject)
+
+quibble <- function(x, q = seq(.1, .9, .2)) {
+  tibble(x = quantile(x, q), q = q)
+}
+
+
+dataset %>%
+  group_by(participant, lex, blur,corr) %>%
+  summarise(RT = list(quibble(rt, seq(.1, .9, .2)))) %>% 
+  tidyr::unnest(RT) -> data.quantiles
+
+
+data.delta <- data.quantiles %>%
+  dplyr::filter(corr==1) %>%
+  dplyr::select(-corr) %>%
+  dplyr::group_by(participant, lex,blur, q) %>%
+  dplyr::summarize(RT=mean(x),
+            Delta=base::diff(x)) 
+
+
+delta<- data.delta %>%
+ggplot(aes(y=Delta, x=RT, color=blur)) +
+  geom_line(alpha=.3, aes(group=participant), size=1.2)+
+  facet_wrap(~lex)
+
+delta
+  
+```
+```{r}
+#Delta plots (based on vincentiles)
+data.quantiles %>%
+  filter(corr==1, lex=="m") %>%
+  select(-corr) %>%
+  group_by(lex,blur,q) %>%
+  summarize(RT=mean(x)) ->vincentiles
+
+vincentiles %>%
+  dplyr::group_by(blur,q) %>%
+  dplyr::summarise(MRT=mean(RT)),
+            Delta=diff(RT)) %>%
+ggplot(aes(y=Delta, x=MRT)) +
+  geom_line()+
+  geom_point()+
+  facet_wrap(~blur) +
+  ylim(0, 10)
+
+```
+
+```{r}
+
+p_mean <- dataset %>%  #get means for plot
+  dplyr::filter(lex=="m") %>%
+    dplyr::group_by(participant, blur)%>%
+     dplyr::summarise(mean1=mean(corr))
+      
+top_mean <- p_mean  %>% 
+  dplyr::group_by(blur)%>%
+    dplyr::summarise(mean1=mean(mean1)) %>%
+   dplyr::ungroup()
+
+
+```
+
+```{r}
+p4 <- ggplot(p_mean, aes(x = blur , y = mean1, fill = blur)) +
+    coord_cartesian(ylim = c(.5,1)) + 
+  
+  ggdist::stat_halfeye(
+    aes(
+      y = mean1,
+      color = blur,
+      fill = after_scale(lighten(color, .5))
+    ),
+    shape = 18,
+    point_size = 3,
+    interval_size = 1.8,
+    adjust = .5,
+    .width = c(0, 1)
+  ) +
+    geom_point(aes(x = blur, y = mean1, colour = blur),position = position_jitter(width = .10), size = 1, shape = 20)+
+    geom_boxplot(aes(x = blur, y = mean1, fill = blur),outlier.shape = NA, alpha = .5, width = .1, colour = "black")+
+  labs(subtitle = "Word Accuracy")+
+     scale_colour_brewer(palette = "Dark2")+
+  scale_fill_brewer(palette = "Dark2") + 
+    stat_summary(fun="mean", geom="point", colour="darkred", size=3)+
+    labs(y = "Accuracy", x = "Blur") + theme_bw(base_size = 14)+
+    geom_label_repel(data=top_mean, aes(y=mean1, label=round(mean1, 2)), color="black", min.segment.length = 0, seed = 42, box.padding = 0.5) + 
+    theme(axis.text=bold) + theme(legend.position = "none") 
+  #  ggsave('place.png', width = 8, height = 6)
+
+p4
+```
+```{r}
+
+p_mean <- dataset %>%  #get means for plot
+  dplyr::filter(lex=="z") %>%
+    dplyr::group_by(date, blur)%>%
+     dplyr::summarise(mean1=mean(corr))
+      
+top_mean <- p_mean  %>% dplyr::group_by(blur)%>%
+    dplyr::summarise(mean1=mean(mean1)) %>%
+   dplyr::ungroup()
+
+
+```
+
+```{r}
+p5 <- ggplot(p_mean, aes(x = blur , y = mean1, fill = blur)) +
+    coord_cartesian(ylim = c(.5,1)) + 
+  
+  ggdist::stat_halfeye(
+    aes(
+      y = mean1,
+      color = blur,
+      fill = after_scale(lighten(color, .5))
+    ),
+    shape = 18,
+    point_size = 3,
+    interval_size = 1.8,
+    adjust = .5,
+    .width = c(0, 1)
+  ) +
+    geom_point(aes(x = blur, y = mean1, colour = blur),position = position_jitter(width = .10), size = 1, shape = 20)+
+    geom_boxplot(aes(x = blur, y = mean1, fill = blur),outlier.shape = NA, alpha = .5, width = .1, colour = "black")+
+  labs(subtitle = "Nonword Accuracy")+
+     scale_colour_brewer(palette = "Dark2")+
+  scale_fill_brewer(palette = "Dark2") + 
+    stat_summary(fun="mean", geom="point", colour="darkred", size=3)+
+    labs(y = "Accuracy", x = "Blur") + theme_bw(base_size = 14)+
+    geom_label_repel(data=top_mean, aes(y=mean1, label=round(mean1, 2)), color="black", min.segment.length = 0, seed = 42, box.padding = 0.5) + 
+    theme(axis.text=bold) + theme(legend.position = "none") 
+  #  ggsave('place.png', width = 8, height = 6)
+
+p5
+```
+
+
+```{r}
+
+p_mean <- dataset %>%  #get means for plot
+  dplyr::filter(lex=="m") %>%
+    dplyr::group_by(date, blur)%>%
+     dplyr::summarise(mean1=mean(rt))
+      
+top_mean <- p_mean  %>% dplyr::group_by(blur)%>%
+    dplyr::summarise(mean1=mean(mean1)) %>%
+   dplyr::ungroup()
+      
+
+
+```
+
+# Memory
+
+Because we have key presses and clicks we need to split and combine 
+
+# Conditionale
+
+```
+
+
+```
+
+```{r}
+
+
+dataset_mem_key <- rts %>% 
+  dplyr::filter(test_phase.thisRepN==0) %>%
+  dplyr::select(participant, date, study, string, blur, rt, corr, lex, key_resp_3.keys)%>%
+  rename("sayold"="key_resp_3.keys") %>%
+  drop_na() 
+
+dataset_mem_click <- rts %>% 
+  dplyr::filter(test_phase.thisRepN==0) %>%
+  dplyr::select(participant, date, study, string, blur, rt, corr, lex, test_click.clicked_name)%>%
+  rename("sayold"="test_click.clicked_name") %>%
+  mutate(sayold=ifelse(sayold=="button_right_test","m", "z")) %>%
+  drop_na()
+
+bad_p=c("200254", "200254")
+
+dataset_mem<-rbind(dataset_mem_key, dataset_mem_click)
+
+dataset_mem_new<- dataset_mem %>% filter(participant != bad_p)
+
+old<-dataset_mem_new %>% filter(study=="m" | study=="old") # get old
+
+
+rt_study_old<-dataset %>% select(participant, string, corr, blur) %>%
+  dplyr::rename("corr_rt" = "corr")%>%
+  merge(old, .) %>% # get words at encoding and merge %>% 
+  mutate(cond=ifelse(corr_rt==0, 1, 0))%>%
+  filter(cond!=1) %>%
+  select(-corr_rt, -cond)
+
+# 
+
+new= dataset_mem %>%
+  filter(study=="z"|study=="new")
+
+
+
+old_new=rbind(rt_study_old,new)
+
+
+```
+
+
+
+# dprime
+
+```{r}
+
+#response as character
+#calculate hit rate and far and compute dprime and other measures
+ex4=old_new %>% 
+  dplyr::mutate(condition1= dplyr::case_when(
+blur == "C"~ "Clear",
+blur =="HB" ~ "High Blur",
+TRUE ~ "Low Blur"), 
+isold= dplyr::case_when (
+study== "m" ~ 1,
+study== "z" ~ 0),
+sayold=dplyr::case_when(
+sayold=="m"~ 1,
+sayold=="z" ~ 0,
+))
+#classic SDT
+sdt <- ex4 %>%
+dplyr::mutate(type = "hit",
+type = ifelse(isold==1 & sayold==0, "miss", type),
+type = ifelse(isold==0 & sayold==0, "cr", type), # Correct rejection
+type = ifelse(isold==0 & sayold==1, "fa", type))
+
+
+
+sdt <- sdt %>%
+dplyr::group_by(participant, blur, type) %>%
+dplyr::summarise(count = n()) %>%
+tidyr::spread(type, count) # Format data to one row per person
+
+
+
+sdt <- sdt %>%
+dplyr::group_by(participant, blur)%>%
+dplyr::mutate(hr = hit / (hit+miss),
+fa = fa / (fa+cr)) %>%
+dplyr::mutate(hr=case_when(
+is.na(hr) ~ 0.99,
+TRUE ~ hr),
+fa=case_when(
+is.na(fa) ~ 0.01,
+TRUE ~ fa),
+zhr=qnorm(hr),
+zfa=qnorm(fa),
+dprime = zhr-zfa) %>%
+ungroup()
+  
+
+```
+
+
+```{r}
+library(afex)#ANOVA
+library(report)#report ANOVA results
+library(emmeans)#postdoc
+a1 <- aov_ez("participant", "dprime", sdt,within=c("blur")) # mixed
+summary(a1)
+
+```
+
+
+```
+
