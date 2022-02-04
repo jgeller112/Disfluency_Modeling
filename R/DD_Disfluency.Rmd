@@ -17,6 +17,7 @@ When you click the **Knit** button a document will be generated that includes bo
 
 ```{r cars}
 library(brms)
+library(plyr)
 library(osfr)
 library(tidyverse)
 library(here)
@@ -45,9 +46,9 @@ rts_pilot
 
 
 
-file<-list.files(here::here("pilot_data"), pattern = ".csv") # get files 
+file<-list.files(here::here("data"), pattern = ".csv") # get files 
 
-setwd(here::here("pilot_data"))
+setwd(here::here("data"))
 
 rt <-
   do.call("rbind.fill", lapply(file, FUN=function(files){
@@ -65,16 +66,14 @@ rt <-
 ```{r}
 
 rt1<- rt %>%
-  filter(maintrials.ran==1)%>%
-  select(participant, string, blur, study, lex, corr, rt) %>%
-  mutate(lex=ifelse(lex=="y", "word", "nonword"))
-#mutate(rt_win=datawizard::winsorize(rt))
-
+  dplyr::filter(maintrials.thisRepN==0)%>%
+  filter(lex=="m")%>%
+  select(participant, string, blur, study, lex, corr, rt)
 rt1
 
 accuracy<-rt1 %>%
   dplyr::group_by(participant)%>%
-  dplyr::summarise(accuray=mean(acc, na.rm=TRUE))
+  dplyr::summarise(accuray=mean(corr))
 
 accuracy
 
@@ -84,32 +83,51 @@ accuracy
 
 
 bform_exg1 <- bf(
-rt ~ blur + (1 |p| subID) + (1 |i| string),
-sigma ~ blur + (1 |p| subID) + (1 |i| string),
-beta ~ blur + (1 |p| subID) + (1 |i| string)
+rt ~ blur + (1 |p| participant) + (1 |i| string),
+sigma ~ blur + (1 |p|participant) + (1 |i| string),
+beta ~ blur + (1 |p| participant) + (1 |i| string)
 )
 
 ```
 
 
 ```{r}
-rotation<- rotation %>%
-  group_by(subID) %>%
-  mu
-  filter(lex=="word", rt>.2, rt < 2)
+rotation<- rt1 %>%
+  group_by(participant) %>%
+  dplyr::filter(rt > .20 & rt < 2.5)
 
 rotation
+
+
 ```
 
+
+```{r}
+ncores = parallel::detectCores()
+# Mean RTs in each condition
+
+prior_exp1 <- c(set_prior("normal(0,100)", class = "b"))
+
+
+```
 
 ```{r}
 
 library(cmdstanr)
 
+
 fit_exg1 <- brm(
 bform_exg1, data = rotation,
-family = brmsfamily("exgaussian", link_sigma = "log", link_beta = "log"),
-control = list(adapt_delta = 0.99), chains=4, cores=4, threads = threading(4),  backend="cmdstanr")
+warmup = 1000,
+                    iter = 5000,
+                    chains = 4,
+                    prior = prior_exp1,
+                    family = exgaussian(),
+                    inits = "random",
+                    cores = 4, 
+control = list(adapt_delta = 0.99), 
+backend="cmdstanr", 
+threads = threading(4))
 
 
 save(fit_exg1, file = "blmm_exp1_rt_dist_revision.RData")
@@ -117,9 +135,7 @@ save(fit_exg1, file = "blmm_exp1_rt_dist_revision.RData")
 ```
 
 ```{r}
-
-
-pp_check(fit_exg1)
+pp_check(fit_exg1,ndraws = 100 )
 ```
 
 ```{r}
@@ -134,12 +150,14 @@ p1
 p2
 
 p3
+
 p1+p2+p3
 
 ```
 
 ```{r}
 #fit 3 parm diff
+
 bform_drift1 <- bf(
 rt| dec(corr) ~ blur + (1 |p| subID),
 bs ~ blur + (1 |p| subID) ,
@@ -165,6 +183,5 @@ control = list(adapt_delta = 0.99)
  )
 
 save(fit_drift1, file = "drift_rt_dist_revision.RData")
-
 
 ```
