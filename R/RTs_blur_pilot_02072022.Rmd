@@ -521,6 +521,71 @@ theme_update(
 )
 pal <- c("#FF8C00", "#A034F0", "#159090")
 ```
+```{r}
+
+## flat violinplots
+### It relies largely on code previously written by David Robinson 
+### (https://gist.github.com/dgrtwo/eb7750e74997891d7c20) and ggplot2 by H Wickham
+
+
+#check if required packages are installed
+packages <- c("cowplot", "readr", "ggplot2" , "dplyr", "lavaan", "smooth", "Hmisc")
+if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
+  install.packages(setdiff(packages, rownames(installed.packages())))  
+}
+
+#Load packages
+library(ggplot2)
+library(dplyr)
+library(lavaan)
+
+# Defining the geom_flat_violin function. Note: the below code modifies the 
+# existing github page by removing a parenthesis in line 50
+
+"%||%" <- function(a, b) {
+  if (!is.null(a)) a else b
+}
+
+geom_flat_violin <- function(mapping = NULL, data = NULL, stat = "ydensity",
+                             position = "dodge", trim = TRUE, scale = "area",
+                             show.legend = NA, inherit.aes = TRUE, ...) {
+  layer(
+    data = data,
+    mapping = mapping,
+    stat = stat,
+    geom = GeomFlatViolin,
+    position = position,
+    show.legend = show.legend,
+    inherit.aes = inherit.aes,
+    params = list(
+      trim = trim,
+      scale = scale,
+      ...
+    )
+  )
+}
+
+
+# horizontal nudge position adjustment
+# copied from https://github.com/tidyverse/ggplot2/issues/2733
+position_hnudge <- function(x = 0) {
+  ggproto(NULL, PositionHNudge, x = x)
+}
+
+
+PositionHNudge <- ggproto("PositionHNudge", Position,
+                          x = 0,
+                          required_aes = "x",
+                          setup_params = function(self, data) {
+                            list(x = self$x)
+                          },
+                          compute_layer = function(data, params, panel) {
+                            transform_position(data, function(x) x + params$x)
+                          }
+)
+```
+
+
 
 ```{r}
 top_mean <-dprime %>%  #get means for plot
@@ -532,6 +597,10 @@ p_mean <-dprime %>%  #get means for plot
     dplyr::group_by(participant, blur)%>%
      dplyr::summarise(mean1=mean(dprime))
       
+# get withinsubject CIs
+sfgend_wsci= Rmisc::summarySEwithin(data = dprime, measurevar = "dprime",
+                       withinvars = "blur",idvar = "participant")
+
 bold <- element_text(face = "bold", color = "black", size = 14) #axis bold
                                                 
 p3 <- ggplot(p_mean, aes(x =blur, y = mean1, fill = blur)) + 
@@ -552,19 +621,23 @@ p3 <- ggplot(p_mean, aes(x =blur, y = mean1, fill = blur)) +
     geom_point(aes(x = blur, y = mean1, colour = blur),position = position_jitter(width = .10), size = 1, shape = 20)+
     geom_boxplot(aes(x = blur, y = mean1, fill = blur),outlier.shape = NA, alpha = .5, width = .1, colour = "black")+
   labs(
-    subtitle = "Final Test Performance: 24-48 Hrs",
-    caption = 'Delayed and RP conditions do not differ from one another. Both are better than RS.'
-  )+
+    subtitle = "Sensitivity by Level of Blurring",
+    caption = 'Simialr to other studies using blurring we see HB words are better remembered than Clear words. We do not see a difference')+
      scale_colour_brewer(palette = "Dark2")+
   scale_fill_brewer(palette = "Dark2") + 
-    stat_summary(fun="mean", geom="point", colour="darkred", size=3)+
+   # stat_summary(fun="mean", geom="point", colour="darkred", size=3)+
+      geom_pointrange(data=sfgend_wsci, aes(y=dprime, ymin=dprime-ci, ymax=dprime+ci), size=.7, color="black", position = position_hnudge(x = 0.1))+
+   #stat_summary(fun="mean_cl_normal", geom="errorbar", colour="darkred", size=3)+
     labs(y = "D prime", x = "Blur Condition") + theme_bw(base_size = 16)+
-    geom_label_repel(data=top_mean, aes(y=mean1, label=round(mean1, 2)), color="black", min.segment.length = 0, seed = 42, box.padding = 0.5) + 
+    geom_label_repel(data=top_mean, aes(y=mean1, label=round(mean1, 2)), color="black", min.segment.length = 0, seed = 42, box.padding = 0.5, position = position_hnudge(x = 0.1)) + 
     theme(axis.text=bold) + theme(legend.position = "none") 
   #  ggsave('place.png', width = 8, height = 6)
 
 p3
 
+
+ggsave(here::here("figures", "dprime.pdf"), 
+       width = 13, height = 8, device = cairo_pdf)
 
 ```
 
@@ -610,5 +683,9 @@ summary(a1)
 ```
 
 
+```{r session}
+Sys.time()
+sessionInfo()
 ```
+
 
