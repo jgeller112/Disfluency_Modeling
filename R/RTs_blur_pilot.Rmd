@@ -390,8 +390,8 @@ blur == "C"~ "Clear",
 blur =="HB" ~ "High Blur",
 TRUE ~ "Low Blur"), 
 isold= dplyr::case_when (
-study== "m" ~ 1,
-study== "z" ~ 0),
+study== "m" | study=="old" ~ 1,
+study== "z" | study=="new" ~ 0),
 sayold=dplyr::case_when(
 sayold=="m"~ 1,
 sayold=="z" ~ 0,
@@ -429,6 +429,93 @@ ungroup()
   
 
 ```
+```{r}
+# plot HR and FAR
+source("https://gist.githubusercontent.com/benmarwick/2a1bb0133ff568cbe28d/raw/fb53bd97121f7f9ce947837ef1a4c65a73bffb3f/geom_flat_violin.R")
+sdt1=sdt  %>% select(participant, blur, hr, fa) %>% 
+  pivot_longer(hr:fa, names_to="type") %>%
+  dplyr::mutate(isold=case_when(type=="hr" ~ "Old", type=="fa" ~ "New"))
+
+sdt1$isold<-factor(sdt1$isold, levels=c("Old", "New"))
+
+sdt1$Condition<-factor(sdt1$blur, levels=c("C", "LB", "HB"))
+
+
+fig1b <- ggplot(sdt1,aes(x=Condition,y=value,fill=Condition))+ facet_grid(~isold) + 
+  geom_flat_violin(position = position_nudge(x = .2, y = 0), alpha = .4,adjust=4)+
+  geom_point(position=position_jitter(width = .15),size = 1, alpha = 0.2) + 
+  geom_boxplot(aes(x = Condition, y = value),outlier.shape = NA,
+               alpha = 0.3, width = .1, colour = "BLACK") +
+    stat_summary(fun=mean, geom="point", colour="darkred", size=5)+
+  theme_cowplot() +
+  scale_colour_brewer(palette = "Dark2")+
+  scale_fill_brewer(palette = "Dark2") +
+  labs(y = "Pr Saying Old", x = "Typeface") + theme(legend.position = "none")
+
+
+fig1b
+
+
+```
+
+```{r}
+# Plot drime
+theme_set(theme_minimal(base_size = 16, base_family = "Arial"))
+
+dprime=sdt  %>% select(participant, blur, dprime)
+
+
+
+# get withinsubject CIs
+sfgend_wsci= Rmisc::summarySEwithin(data = dprime, measurevar = "dprime",
+                       withinvars = "blur",idvar = "participant")
+#plot
+
+fig1a <- ggplot(dprime,aes(x=blur,y=dprime,fill=blur))+
+  #geom_flat_violin(position = position_nudge(x = .2, y = 0), alpha = .4,adjust=4)+
+  geom_point(position=position_jitter(width = .15),size = 1, alpha = 0.2) + 
+  geom_boxplot(aes(x = blur, y = dprime),outlier.shape = NA,
+               alpha = 0.3, width = .1, colour = "BLACK") +
+    geom_line(data=sfgend_wsci,aes(y=dprime, group=1), size=1)+ 
+  #stat_summary(fun="mean", geom="point", colour="darkred", size=3) + 
+    geom_pointrange(data=sfgend_wsci, aes(y=dprime, ymin=dprime, ymax=dprime), size=.8, color="darkred")+
+  theme_cowplot() +
+  scale_colour_brewer(palette = "Dark2")+
+  scale_fill_brewer(palette = "Dark2") +
+  labs(y = "Sensitivity(d')", x = "Typeface") + theme(legend.position = "none") + 
+    geom_label_repel(data=sfgend_wsci, aes(y=dprime, label=round(dprime, 2)), min.segment.length = 0, seed = 42, box.padding = 0.5)
+
+
+fig1a
+```
+```{r}
+hrate<-sdt %>% select(participant, hr, blur)
+
+
+# get withinsubject CIs
+sfgend_wsci= Rmisc::summarySEwithin(data = hrate, measurevar = "hr",
+                       withinvars = "blur",idvar = "participant")
+#plot
+
+fig1a <- ggplot(hrate,aes(x=blur,y=hr,fill=blur))+
+  #geom_flat_violin(position = position_nudge(x = .2, y = 0), alpha = .4,adjust=4)+
+  geom_point(position=position_jitter(width = .15),size = 1, alpha = 0.2) + 
+  geom_boxplot(aes(x = blur, y = hr),outlier.shape = NA,
+               alpha = 0.3, width = .1, colour = "BLACK") +
+    geom_line(data=sfgend_wsci,aes(y=hr, group=1), size=1)+ 
+  #stat_summary(fun="mean", geom="point", colour="darkred", size=3) + 
+    geom_pointrange(data=sfgend_wsci, aes(y=hr, ymin=hr, ymax=hr), size=.5, color="darkred")+
+  theme_cowplot() +
+  scale_colour_brewer(palette = "Dark2")+
+  scale_fill_brewer(palette = "Dark2") +
+  labs(y = "Hit rate", x = "Typeface") + theme(legend.position = "none") + 
+    geom_label_repel(data=sfgend_wsci, aes(y=hr, label=round(hr, 2)), min.segment.length = 0, seed = 42, box.padding = 0.5)
+
+
+fig1a
+
+```
+
 
 
 ```{r}
