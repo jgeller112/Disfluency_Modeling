@@ -63,8 +63,9 @@ rts <-
 #collect RTs
 dataset <- rts %>% 
   dplyr::filter(maintrials.thisRepN==0) %>%
-  dplyr::select(participant, date, string, study, blur, rt, corr, lex)%>%
-  drop_na()
+  dplyr::select(participant, date, string, study, blur, rt, corr, lex, key_resp_2.keys)%>%
+  mutate(lex=ifelse(lex=="y", "m", ifelse(lex=="n", "z", lex)), corr=ifelse(lex==key_resp_2.keys, 1, 0)) %>%
+   drop_na()
 ```
 
 ```{r}
@@ -335,47 +336,76 @@ Because we have key presses and clicks we need to split and combine
 ```{r}
 
 
+#collect RTs for keypress
+dataset_m_rts <- rts %>% 
+  dplyr::filter(maintrials.thisRepN==0) %>%
+  dplyr::select(participant, date, string, study, blur, rt, corr, lex, key_resp_2.keys)%>%
+  mutate(encode_lex=ifelse(lex=="y", "m", ifelse(lex=="n", "z", lex)), study=ifelse(study=="old", "m", study), lex_corr=ifelse(encode_lex==key_resp_2.keys, 1, 0)) %>%
+  rename("response"= "key_resp_2.keys")%>%
+  filter(encode_lex=="m")%>%
+  select(-corr, -lex)%>%
+   drop_na()
+
+#collect rts for button presses
+dataset_m_clicks <- rts %>% 
+  dplyr::filter(maintrials.thisRepN==0) %>%
+  dplyr::select(participant, date, string, study, blur, rt, corr, lex, targ_click.clicked_name)%>%
+  mutate(clicked=ifelse(targ_click.clicked_name=="button_right_main","m", "z"), encode_lex=ifelse(lex=="y", "m", ifelse(lex=="n", "z", lex)), study=ifelse(study=="old", "m", study), lex_corr=ifelse(encode_lex==clicked, 1, 0)) %>%
+  dplyr::filter(encode_lex=="m")%>%
+  select(-corr, -lex, -clicked)%>%
+  rename("response"= "targ_click.clicked_name") %>%
+  na.omit(.)
+
+#bind responses
+dataset_rts<-rbind(dataset_m_rts, dataset_m_clicks)
+
+#get study responses for rts
 dataset_mem_key <- rts %>% 
   dplyr::filter(test_phase.thisRepN==0) %>%
   dplyr::select(participant, date, study, string, blur, rt, corr, lex, key_resp_3.keys)%>%
+  mutate(study=ifelse(study=="old", "m", ifelse(study=="new", "z", study)))%>%
   rename("sayold"="key_resp_3.keys") %>%
   drop_na() 
+#get study responses for button presses
 
 dataset_mem_click <- rts %>% 
   dplyr::filter(test_phase.thisRepN==0) %>%
   dplyr::select(participant, date, study, string, blur, rt, corr, lex, test_click.clicked_name)%>%
   rename("sayold"="test_click.clicked_name") %>%
+  mutate(study=ifelse(study=="old", "m", ifelse(study=="new", "z", study)))%>%
   mutate(sayold=ifelse(sayold=="button_right_test","m", "z")) %>%
   drop_na()
-
+# Ps took experiment more than once
 bad_p=c("200254", "200254")
-
+# bind the memory responses 
 dataset_mem<-rbind(dataset_mem_key, dataset_mem_click)
-
+# get rid of bad Ps
 dataset_mem_new<- dataset_mem %>% filter(participant != bad_p)
+#get the old stims
+old<-dataset_mem_new  %>%
+  filter(study=="m") # get old
 
-old<-dataset_mem_new %>% filter(study=="m" | study=="old") # get old
+#bind old accuracy with studied items and get rid of items not successfully identified at study
 
-
-rt_study_old<-dataset %>% select(participant, string, corr, blur) %>%
-  dplyr::rename("corr_rt" = "corr")%>%
-  merge(old, .) %>% # get words at encoding and merge %>% 
-  mutate(cond=ifelse(corr_rt==0, 1, 0))%>%
+rt_study_old<-dataset_rts %>% select(participant, study, date, string, blur, lex_corr) %>%
+  dplyr::rename("corr_rt" = "lex_corr")%>%
+  left_join(old,., by=c("participant", "study", "string", "date", "blur"))  %>% # get words at encoding and merge %>% 
+  mutate(cond=ifelse(corr_rt==0, 1, 0), )%>%
   filter(cond!=1) %>%
   select(-corr_rt, -cond)
 
-# 
+# get new items 
 
 new= dataset_mem %>%
-  filter(study=="z"|study=="new")
+  filter(study=="z")
 
 
+# merge old and new items together
 
 old_new=rbind(rt_study_old,new)
 
 
 ```
-
 
 
 # dprime
@@ -405,14 +435,12 @@ type = ifelse(isold==0 & sayold==1, "fa", type))
 
 
 
-sdt <- sdt %>%
-dplyr::group_by(participant, blur, type) %>%
-dplyr::summarise(count = n()) %>%
-tidyr::spread(type, count) # Format data to one row per person
+sdt1 <- sdt %>% 
+  dplyr::group_by(participant, type,blur) %>% 
+  dplyr::summarise(count = n()) %>% 
+  tidyr::spread(type, count)  # Format data to one row per person
 
-
-
-sdt <- sdt %>%
+sdt2 <- sdt1 %>%
 dplyr::group_by(participant, blur)%>%
 dplyr::mutate(hr = hit / (hit+miss),
 fa = fa / (fa+cr)) %>%
@@ -432,7 +460,7 @@ ungroup()
 ```{r}
 # plot HR and FAR
 source("https://gist.githubusercontent.com/benmarwick/2a1bb0133ff568cbe28d/raw/fb53bd97121f7f9ce947837ef1a4c65a73bffb3f/geom_flat_violin.R")
-sdt1=sdt  %>% select(participant, blur, hr, fa) %>% 
+sdt1=sdt2  %>% select(participant, blur, hr, fa) %>% 
   pivot_longer(hr:fa, names_to="type") %>%
   dplyr::mutate(isold=case_when(type=="hr" ~ "Old", type=="fa" ~ "New"))
 
@@ -462,7 +490,7 @@ fig1b
 # Plot drime
 theme_set(theme_minimal(base_size = 16, base_family = "Arial"))
 
-dprime=sdt  %>% select(participant, blur, dprime)
+dprime=sdt2  %>% select(participant, blur, dprime)
 
 
 
