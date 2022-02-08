@@ -176,18 +176,17 @@ quibble <- function(x, q = seq(.1, .9, .2)) {
 }
 
 
-dataset %>%
-  group_by(participant, lex, blur,corr) %>%
+dataset_rts %>%
+  group_by(participant,blur,lex_corr) %>%
   summarise(RT = list(quibble(rt, seq(.1, .9, .2)))) %>% 
   tidyr::unnest(RT) -> data.quantiles
 
 
 data.delta <- data.quantiles %>%
-  dplyr::filter(corr==1) %>%
-  dplyr::select(-corr) %>%
-  dplyr::group_by(participant, lex,blur, q) %>%
-  dplyr::summarize(RT=mean(x),
-            Delta=base::diff(x)) 
+  dplyr::filter(lex_corr==1) %>%
+  dplyr::select(-lex_corr) %>%
+  dplyr::group_by(participant, blur, q) %>%
+  dplyr::summarize(RT=mean(x))
 
 
 delta<- data.delta %>%
@@ -201,20 +200,24 @@ delta
 ```{r}
 #Delta plots (based on vincentiles)
 data.quantiles %>%
-  filter(corr==1, lex=="m") %>%
-  select(-corr) %>%
-  group_by(lex,blur,q) %>%
+  filter(lex_corr==1) %>%
+  select(-lex_corr) %>%
+  group_by(blur,q) %>%
   summarize(RT=mean(x)) ->vincentiles
 
-vincentiles %>%
+v=vincentiles %>%
   dplyr::group_by(blur,q) %>%
-  dplyr::summarise(MRT=mean(RT)),
-            Delta=diff(RT)) %>%
-ggplot(aes(y=Delta, x=MRT)) +
+  dplyr::summarise(MRT=mean(RT))
+
+ggplot(data=v,aes(y=MRT, x=q, color=blur)) +
   geom_line()+
   geom_point()+
-  facet_wrap(~blur) +
-  ylim(0, 10)
+  ylim(0, 2)
+
+ggplot(data=v,aes(y=MRT, x=blur, color=q)) +
+  geom_line()+
+  geom_point(size=4)
+
 
 ```
 
