@@ -142,7 +142,10 @@ pp_check(fit_exg1,ndraws = 100 )
 ```
 
 ```{r}
-library(patchwork)
+
+
+estimate_contrasts(fit_exg1) # get models fits
+
 
 p1<-conditional_effects(fit_exg1, "blur1", dpar = "mu")
 p2<-conditional_effects(fit_exg1, "blur", dpar = "sigma")
