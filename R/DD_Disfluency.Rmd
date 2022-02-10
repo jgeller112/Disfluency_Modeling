@@ -22,6 +22,9 @@ library(osfr)
 library(tidyverse)
 library(here)
 library(data.table)
+#devtools::install_github("mmrabe/hypr", build_vignettes = TRUE)
+library(hypr)
+library(modelbased)
 ```
 
 # Load Data
@@ -123,7 +126,7 @@ warmup = 1000,
                     chains = 4,
                     prior = prior_exp1,
                     family = exgaussian(),
-                    inits = "random",
+                    inits = 0,
                     cores = 4, 
 control = list(adapt_delta = 0.99), 
 backend="cmdstanr", 
@@ -141,7 +144,7 @@ pp_check(fit_exg1,ndraws = 100 )
 ```{r}
 library(patchwork)
 
-p1<-conditional_effects(fit_exg1, "blur", dpar = "mu")
+p1<-conditional_effects(fit_exg1, "blur1", dpar = "mu")
 p2<-conditional_effects(fit_exg1, "blur", dpar = "sigma")
 p3<- conditional_effects(fit_exg1, "blur", dpar = "beta")
 
@@ -183,5 +186,11 @@ control = list(adapt_delta = 0.99)
  )
 
 save(fit_drift1, file = "drift_rt_dist_revision.RData")
+
+```
+
+#SDT BRM
+```{r}
+
 
 ```

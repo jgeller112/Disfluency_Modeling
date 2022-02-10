@@ -342,11 +342,11 @@ Because we have key presses and clicks we need to split and combine
 #collect RTs for keypress
 dataset_m_rts <- rts %>% 
   dplyr::filter(maintrials.thisRepN==0) %>%
-  dplyr::select(participant, date, string, study, blur, rt, corr, lex, key_resp_2.keys)%>%
+  dplyr::select(participant, date, string, study, blur, rt, corr, lex, key_resp_2.keys) %>%
   mutate(encode_lex=ifelse(lex=="y", "m", ifelse(lex=="n", "z", lex)), study=ifelse(study=="old", "m", study), lex_corr=ifelse(encode_lex==key_resp_2.keys, 1, 0)) %>%
-  rename("response"= "key_resp_2.keys")%>%
-  filter(encode_lex=="m")%>%
-  select(-corr, -lex)%>%
+  dplyr::rename("response"= "key_resp_2.keys")%>%
+  dplyr::filter(encode_lex=="m")%>%
+  dplyr::select(-corr, -lex)%>%
    drop_na()
 
 #collect rts for button presses
@@ -355,9 +355,9 @@ dataset_m_clicks <- rts %>%
   dplyr::select(participant, date, string, study, blur, rt, corr, lex, targ_click.clicked_name)%>%
   mutate(clicked=ifelse(targ_click.clicked_name=="button_right_main","m", "z"), encode_lex=ifelse(lex=="y", "m", ifelse(lex=="n", "z", lex)), study=ifelse(study=="old", "m", study), lex_corr=ifelse(encode_lex==clicked, 1, 0)) %>%
   dplyr::filter(encode_lex=="m")%>%
-  select(-corr, -lex, -clicked)%>%
-  rename("response"= "targ_click.clicked_name") %>%
-  na.omit(.)
+  dplyr::select(-corr, -lex, -clicked)%>%
+  dplyr::rename("response"= "targ_click.clicked_name") %>%
+  drop_na()
 
 #bind responses
 dataset_rts<-rbind(dataset_m_rts, dataset_m_clicks)
@@ -366,15 +366,15 @@ dataset_rts<-rbind(dataset_m_rts, dataset_m_clicks)
 dataset_mem_key <- rts %>% 
   dplyr::filter(test_phase.thisRepN==0) %>%
   dplyr::select(participant, date, study, string, blur, rt, corr, lex, key_resp_3.keys)%>%
-  mutate(study=ifelse(study=="old", "m", ifelse(study=="new", "z", study)))%>%
-  rename("sayold"="key_resp_3.keys") %>%
+  dplyr::mutate(study=ifelse(study=="old", "m", ifelse(study=="new", "z", study)))%>%
+  dplyr::rename("sayold"="key_resp_3.keys") %>%
   drop_na() 
 #get study responses for button presses
 
 dataset_mem_click <- rts %>% 
   dplyr::filter(test_phase.thisRepN==0) %>%
   dplyr::select(participant, date, study, string, blur, rt, corr, lex, test_click.clicked_name)%>%
-  rename("sayold"="test_click.clicked_name") %>%
+  dplyr::rename("sayold"="test_click.clicked_name") %>%
   mutate(study=ifelse(study=="old", "m", ifelse(study=="new", "z", study)))%>%
   mutate(sayold=ifelse(sayold=="button_right_test","m", "z")) %>%
   drop_na()
@@ -386,7 +386,7 @@ dataset_mem<-rbind(dataset_mem_key, dataset_mem_click)
 dataset_mem_new<- dataset_mem %>% filter(participant != bad_p)
 #get the old stims
 old<-dataset_mem_new  %>%
-  filter(study=="m") # get old
+  dplyr::filter(study=="m") # get old
 
 #bind old accuracy with studied items and get rid of items not successfully identified at study
 
@@ -460,6 +460,32 @@ ungroup()
   
 
 ```
+
+```{r}
+library(cmdstanr)
+
+
+Priors <- c(prior(normal(.5, 1.5), nlpar = "dprime"),
+            prior(normal(0, 1.5), nlpar = "c"))
+
+fit_exg1 <- brm(sayold ~ isold*blur + (1+isold |participant), data=ex4, 
+warmup = 1000,
+                    iter = 5000,
+                    chains = 4, 
+                    inits=0, 
+                    family = bernoulli(link = "probit"),
+                    cores = 4, 
+control = list(adapt_delta = 0.99), 
+backend="cmdstanr", 
+threads = threading(4))
+
+
+save(fit_sdt, file = "blmm_exp1_sdt.RData")
+
+
+```
+
+
 ```{r}
 # plot HR and FAR
 source("https://gist.githubusercontent.com/benmarwick/2a1bb0133ff568cbe28d/raw/fb53bd97121f7f9ce947837ef1a4c65a73bffb3f/geom_flat_violin.R")
