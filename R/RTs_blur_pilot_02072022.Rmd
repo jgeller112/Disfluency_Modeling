@@ -43,7 +43,7 @@ dataset<-read_csv("rts_pilot_010821.csv")
 
 #data=here::here("Expt2_low_high", "mturk_cue_recall_low")  # path to data files
 
-data=here::here("data")
+data=here::here("Prolific_Data", "all")
 
 file_list_rts=list.files(data, pattern=".csv") # list of data files
 
@@ -63,8 +63,8 @@ rts <-
 #collect RTs
 dataset <- rts %>% 
   dplyr::filter(maintrials.thisRepN==0) %>%
-  dplyr::select(participant, date, string, study, blur, rt, corr, lex, key_resp_2.keys)%>%
-  mutate(lex=ifelse(lex=="y", "m", ifelse(lex=="n", "z", lex)), corr=ifelse(lex==key_resp_2.keys, 1, 0)) %>%
+  dplyr::mutate(par_date=paste(participant, date)) %>%
+  dplyr::select(par_date, date, string, study, blur, rt, corr, lex)%>%
    drop_na()
 ```
 
@@ -176,16 +176,18 @@ quibble <- function(x, q = seq(.1, .9, .2)) {
 }
 
 
-dataset_rts %>%
-  group_by(participant,blur,lex_corr) %>%
-  summarise(RT = list(quibble(rt, seq(.1, .9, .2)))) %>% 
+dataset %>%
+  dplyr::filter(rt > .2 | rt < 2) %>% 
+  dplyr::group_by(par_date,blur,corr) %>%
+  dplyr::filter(lex=="m")%>%
+  dplyr::summarise(RT = list(quibble(rt, seq(.1, .9, .2)))) %>% 
   tidyr::unnest(RT) -> data.quantiles
 
 
 data.delta <- data.quantiles %>%
-  dplyr::filter(lex_corr==1) %>%
-  dplyr::select(-lex_corr) %>%
-  dplyr::group_by(participant, blur, q) %>%
+  dplyr::filter(corr==1) %>%
+  dplyr::select(-corr) %>%
+  dplyr::group_by(par_date, blur, q) %>%
   dplyr::summarize(RT=mean(x))
 
 
@@ -200,10 +202,10 @@ delta
 ```{r}
 #Delta plots (based on vincentiles)
 data.quantiles %>%
-  filter(lex_corr==1) %>%
-  select(-lex_corr) %>%
-  group_by(blur,q) %>%
-  summarize(RT=mean(x)) ->vincentiles
+  dplyr::filter(corr==1) %>%
+  dplyr::select(-corr) %>%
+  dplyr::group_by(blur,q) %>%
+  dplyr::summarize(RT=mean(x)) ->vincentiles
 
 v=vincentiles %>%
   dplyr::group_by(blur,q) %>%
@@ -212,26 +214,27 @@ v=vincentiles %>%
 ggplot(data=v,aes(y=MRT, x=q, color=blur)) +
   geom_line()+
   geom_point()+
-  ylim(0, 2)
+  ylim(.5, 1.3)
 
-ggplot(data=v,aes(y=MRT, x=blur, color=q)) +
+ggplot(data=v,aes(y=MRT, x=fct_relevel(blur, c("HB", "C", "LB")), color=q)) +
   geom_line()+
   geom_point(size=4)
 
 
-```
 
-```{r}
-
-p_mean <- dataset %>%  #get means for plot
-  dplyr::filter(lex=="m") %>%
-    dplyr::group_by(participant, blur)%>%
-     dplyr::summarise(mean1=mean(corr))
-      
-top_mean <- p_mean  %>% 
-  dplyr::group_by(blur)%>%
-    dplyr::summarise(mean1=mean(mean1)) %>%
-   dplyr::ungroup()
+p1 <- ggplot(v, aes(x = q, y = MRT*1000, colour = fct_relevel(blur, level=c("HB", "LB", "C")), group = fct_relevel(blur, level=c("HB", "LB", "C")))) + 
+  geom_line(size = 1) +
+  geom_point(size = 3) +
+  scale_colour_manual(values=c("#dd5129","#0f7ba2","#43b284")) +
+  theme_bw() + 
+  theme(axis.title = element_text(size = 16, face = "bold"), 
+        axis.text = element_text(size = 16),
+        plot.title = element_text(face = "bold", size = 20)) +
+  scale_y_continuous(breaks=seq(500,1300,100)) +
+  theme(legend.title=element_blank())+
+    coord_cartesian(ylim = c(500, 1300)) +
+  scale_x_continuous(breaks=seq(.1,.9, .2))+
+  labs(title = "Quantile Analysis", x = "Quantiles", y = "Response latencies in ms")
 
 
 ```
@@ -265,19 +268,7 @@ p4 <- ggplot(p_mean, aes(x = blur , y = mean1, fill = blur)) +
 
 p4
 ```
-```{r}
 
-p_mean <- dataset %>%  #get means for plot
-  dplyr::filter(lex=="z") %>%
-    dplyr::group_by(date, blur)%>%
-     dplyr::summarise(mean1=mean(corr))
-      
-top_mean <- p_mean  %>% dplyr::group_by(blur)%>%
-    dplyr::summarise(mean1=mean(mean1)) %>%
-   dplyr::ungroup()
-
-
-```
 
 ```{r}
 p5 <- ggplot(p_mean, aes(x = blur , y = mean1, fill = blur)) +
@@ -315,10 +306,10 @@ p5
 p_mean <- dataset %>%  #get means for plot
   dplyr::filter(lex=="m") %>%
     dplyr::group_by(date, blur)%>%
-     dplyr::summarise(mean1=mean(rt))
+     dplyr::summarise(mean1=median(rt))
       
 top_mean <- p_mean  %>% dplyr::group_by(blur)%>%
-    dplyr::summarise(mean1=mean(mean1)) %>%
+    dplyr::summarise(mean1=median(mean1)) %>%
    dplyr::ungroup()
       
 
@@ -330,9 +321,6 @@ top_mean <- p_mean  %>% dplyr::group_by(blur)%>%
 Because we have key presses and clicks we need to split and combine 
 
 # Conditionalzed on recognizing words during encoding 
-
-```
-
 
 ```
 
@@ -578,6 +566,7 @@ theme_update(
 )
 pal <- c("#FF8C00", "#A034F0", "#159090")
 ```
+
 ```{r}
 
 ## flat violinplots

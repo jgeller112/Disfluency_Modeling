@@ -81,23 +81,38 @@ accuracy<-rt1 %>%
 accuracy
 
 ```
+# Ex-Guassian Model
 
 ```{r}
-
+# fit 
 
 bform_exg1 <- bf(
-rt ~ blur + (1 |p| participant) + (1 |i| string),
-sigma ~ blur + (1 |p|participant) + (1 |i| string),
-beta ~ blur + (1 |p| participant) + (1 |i| string)
+rt ~ blur + (1 + blur |p| participant) + (1 + blur|i| string),
+sigma ~ blur + (1 + blur |p|participant) + (1 + blur |i| string),
+beta ~ blur + (1 + blur |p| participant) + (1 + blur |i| string)
 )
 
+```
+# Contrasts
+
+```{r}
+#hypothesis
+
+blurC <-hypr(HB~C, LB~C, HB~LB,levels=c("C", "HB", "LB"))
+
+blurC
+
+```
+```{r}
+
+contrasts(df$blur) <-contr.hypothesis(blurC)
 ```
 
 
 ```{r}
 rotation<- rt1 %>%
   group_by(participant) %>%
-  dplyr::filter(rt > .20 & rt < 2.5)
+  dplyr::filter(rt > .2 & rt < 2.5)
 
 rotation
 
@@ -138,7 +153,7 @@ save(fit_exg1, file = "blmm_exp1_rt_dist_revision.RData")
 ```
 
 ```{r}
-pp_check(fit_exg1,ndraws = 100 )
+pp_check(fit_exg1,ndraws = 1000 )
 ```
 
 ```{r}
