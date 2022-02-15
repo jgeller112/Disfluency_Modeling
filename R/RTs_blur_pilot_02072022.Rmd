@@ -286,6 +286,16 @@ scale_y_continuous(breaks=seq(-25,-10,2)) +
   labs( title = "Clear - Low Blur", x = "Quantiles", y = "Group differences")
 
 
+pqpD <- cowplot::plot_grid(p1, p2,
+                   labels=c("", ""), 
+                   ncol = 1, 
+                   nrow = 2,
+                   rel_heights = c(1, 1), 
+                   label_size = 20, 
+                   hjust = -0.8, 
+                   scale=.95,
+                   align = "v")
+
 
 ```
 
